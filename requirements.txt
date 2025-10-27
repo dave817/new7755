@@ -1,0 +1,27 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+PyJWT==2.6.0
+python-dotenv==1.0.0
+sqlalchemy==2.0.23
+aiosqlite==0.14.0
+requests==2.31.0
+opencc-python-reimplemented==0.1.7
+
+# LINE Bot Integration
+# IMPORTANT: Requires Python 3.11 (line-bot-sdk 3.5.0 depends on aiohttp 3.8.5, which doesn't support Python 3.12)
+line-bot-sdk==3.5.0
+
+# Production Database (for Heroku deployment)
+psycopg2-binary==2.9.9
+alembic==1.12.1
+
+# Production Essentials
+sentry-sdk[fastapi]==1.38.0
+python-multipart==0.0.6
+gunicorn==21.2.0
+
+# Performance optimizations (Unix/Linux only - not needed on Windows)
+# uvloop==0.19.0  # Commented out - doesn't work on Windows
+# httptools==0.6.1  # Commented out - optional dependency
