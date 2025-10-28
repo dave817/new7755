@@ -18,6 +18,7 @@ from backend.database import LineUserMapping
 from backend.conversation_manager import ConversationManager
 from backend.api_client import SenseChatClient
 from backend.config import settings
+from backend.text_cleaner import clean_for_line
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,9 @@ class LineEventHandler:
                 if result.get("special_messages"):
                     for special_msg in result["special_messages"]:
                         reply_text += f"\n\n{special_msg['message']}"
+
+                # Clean response text (remove action tags and system artifacts)
+                reply_text = clean_for_line(reply_text)
 
                 # Send response via LINE
                 line_client.reply_message(reply_token, reply_text)

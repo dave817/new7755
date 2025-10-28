@@ -31,6 +31,7 @@ from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, FollowEvent, UnfollowEvent
 from backend.line_client import line_client
 from backend.line_handlers import create_event_handler
+from backend.text_cleaner import clean_for_line
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -387,11 +388,14 @@ async def create_character_v2(
             # Build full picture URL for LINE (LINE needs a publicly accessible URL)
             picture_url = f"{settings.APP_BASE_URL}{character_picture}" if character_picture else None
 
+            # Clean initial message (remove action tags and system artifacts)
+            cleaned_initial_message = clean_for_line(initial_message)
+
             # Send first message via LINE Push API with character picture
             success = line_client.send_character_created_message(
                 user_id=line_user_id,
                 character_name=character.name,
-                initial_message=initial_message,
+                initial_message=cleaned_initial_message,
                 picture_url=picture_url
             )
 
