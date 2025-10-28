@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     # Monitoring (optional)
     SENTRY_DSN: str = ""
 
+    # Stripe Payment Integration
+    STRIPE_API_KEY: str = ""
+    STRIPE_PAYMENT_LINK: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+
     class Config:
         env_file = ".env"
         case_sensitive = True

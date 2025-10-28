@@ -184,17 +184,21 @@ class LineClient:
         if not referral_link:
             referral_link = f"{settings.APP_BASE_URL}/referral?lineUserId={user_id}"
 
-        message = f"""今天的 {settings.FREE_MESSAGES_PER_DAY} 則免費訊息已用完囉~ 😢
+        # Create dynamic checkout link with LINE user ID embedded
+        checkout_url = f"{settings.APP_BASE_URL}/stripe/checkout?lineUserId={user_id}"
 
-想要繼續聊天？你可以：
+        message = f"""您今天的免費訊息已用完 ({settings.FREE_MESSAGES_PER_DAY}/{settings.FREE_MESSAGES_PER_DAY}) 😢
 
-🎁 邀請 {settings.REFERRALS_FOR_UNLIMITED} 位好友使用 → 無限暢聊
-   推薦連結：{referral_link}
+想要繼續聊天嗎？
 
-💎 升級 Premium (${settings.PREMIUM_PRICE_USD}/月) → 無限訊息
-   (即將推出！)
+💎 升級至 Premium (${settings.PREMIUM_PRICE_USD}/月)
+👉 {checkout_url}
 
-明天再來找我聊天吧！💕"""
+Premium 會員享有：
+✨ 無限訊息
+🎁 專屬功能（即將推出）
+
+或者明天再來，免費額度會重置！💕"""
 
         return self.push_message(user_id, message)
 

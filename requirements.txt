@@ -22,6 +22,9 @@ sentry-sdk[fastapi]==1.38.0
 python-multipart==0.0.6
 gunicorn==21.2.0
 
+# Payment Processing
+stripe==7.9.0
+
 # Performance optimizations (Unix/Linux only - not needed on Windows)
 # uvloop==0.19.0  # Commented out - doesn't work on Windows
 # httptools==0.6.1  # Commented out - optional dependency

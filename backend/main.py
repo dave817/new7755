@@ -10,10 +10,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 from pathlib import Path
+from datetime import datetime, timedelta
 import hashlib
 import hmac
 import base64
 import logging
+import stripe
 
 from backend.models import UserProfile, DreamType, CustomMemory
 from backend.character_generator import CharacterGenerator
@@ -59,6 +61,9 @@ else:
 # Initialize services
 api_client = SenseChatClient()
 character_generator = CharacterGenerator(api_client=api_client)
+
+# Initialize Stripe
+stripe.api_key = settings.STRIPE_API_KEY
 
 # Initialize database on startup
 @app.on_event("startup")
@@ -287,6 +292,284 @@ async def process_line_event(event, db: Session):
     except Exception as e:
         logger.error(f"Error processing LINE event: {e}", exc_info=True)
         # Don't raise - we already responded 200 OK to LINE
+
+
+# ==================== Stripe Payment Integration ====================
+
+@app.get("/stripe/checkout")
+async def create_checkout_session(
+    lineUserId: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a Stripe checkout session for a LINE user
+
+    Args:
+        lineUserId: LINE user ID from query parameter
+
+    Returns:
+        Redirects to Stripe checkout page with embedded user metadata
+    """
+    try:
+        # Verify user exists
+        mapping = db.query(LineUserMapping).filter(
+            LineUserMapping.line_user_id == lineUserId
+        ).first()
+
+        if not mapping:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Create Stripe checkout session
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'unit_amount': int(settings.PREMIUM_PRICE_USD * 100),  # Convert to cents
+                    'product_data': {
+                        'name': f'{settings.LINE_BOT_NAME} - Premium 訂閱',
+                        'description': '無限訊息 · 專屬功能',
+                    },
+                    'recurring': {
+                        'interval': 'month',
+                    },
+                },
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=f"{settings.APP_BASE_URL}/stripe/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{settings.APP_BASE_URL}/stripe/cancel",
+            metadata={
+                'line_user_id': lineUserId,
+            },
+            customer_email=None,  # Let user enter their email
+        )
+
+        logger.info(f"Created checkout session for LINE user {lineUserId}: {checkout_session.id}")
+
+        # Redirect to Stripe checkout
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=checkout_session.url, status_code=303)
+
+    except Exception as e:
+        logger.error(f"Failed to create checkout session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create checkout session")
+
+
+@app.get("/stripe/success")
+async def payment_success():
+    """Payment successful page"""
+    return HTMLResponse("""
+    <html>
+        <head>
+            <title>付款成功</title>
+            <meta charset="UTF-8">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    text-align: center;
+                    padding: 50px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                }
+                .container {
+                    background: white;
+                    color: #333;
+                    border-radius: 20px;
+                    padding: 40px;
+                    max-width: 500px;
+                    margin: 0 auto;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                }
+                h1 { color: #667eea; margin-bottom: 20px; }
+                p { font-size: 18px; line-height: 1.6; }
+                .emoji { font-size: 64px; margin: 20px 0; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="emoji">🎉</div>
+                <h1>付款成功！</h1>
+                <p>您的 Premium 訂閱已啟用！</p>
+                <p>請返回 LINE 繼續享受無限暢聊 💕</p>
+                <p style="margin-top: 30px; font-size: 14px; color: #999;">
+                    您可以關閉此視窗
+                </p>
+            </div>
+        </body>
+    </html>
+    """)
+
+
+@app.get("/stripe/cancel")
+async def payment_cancel():
+    """Payment cancelled page"""
+    return HTMLResponse("""
+    <html>
+        <head>
+            <title>付款取消</title>
+            <meta charset="UTF-8">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    text-align: center;
+                    padding: 50px;
+                    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                    color: white;
+                }
+                .container {
+                    background: white;
+                    color: #333;
+                    border-radius: 20px;
+                    padding: 40px;
+                    max-width: 500px;
+                    margin: 0 auto;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                }
+                h1 { color: #f5576c; margin-bottom: 20px; }
+                p { font-size: 18px; line-height: 1.6; }
+                .emoji { font-size: 64px; margin: 20px 0; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="emoji">😢</div>
+                <h1>付款已取消</h1>
+                <p>沒關係！您隨時可以重新訂閱</p>
+                <p>請返回 LINE 繼續使用免費方案</p>
+                <p style="margin-top: 30px; font-size: 14px; color: #999;">
+                    您可以關閉此視窗
+                </p>
+            </div>
+        </body>
+    </html>
+    """)
+
+
+@app.post("/webhook/stripe")
+async def stripe_webhook(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Stripe webhook endpoint for handling payment events
+
+    This endpoint listens for successful payment events from Stripe
+    and activates premium status for the user who completed payment.
+
+    Important: Configure this webhook URL in Stripe Dashboard
+    URL: https://your-app.herokuapp.com/webhook/stripe
+    Events to listen for: checkout.session.completed
+    """
+
+    # Get request body and signature
+    payload = await request.body()
+    sig_header = request.headers.get('stripe-signature')
+
+    # Verify webhook signature (if webhook secret is configured)
+    if settings.STRIPE_WEBHOOK_SECRET:
+        try:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+            )
+        except ValueError as e:
+            # Invalid payload
+            logger.error(f"Invalid Stripe webhook payload: {e}")
+            raise HTTPException(status_code=400, detail="Invalid payload")
+        except stripe.error.SignatureVerificationError as e:
+            # Invalid signature
+            logger.error(f"Invalid Stripe signature: {e}")
+            raise HTTPException(status_code=400, detail="Invalid signature")
+    else:
+        # No signature verification (development mode)
+        import json
+        event = json.loads(payload)
+        logger.warning("Stripe webhook signature verification disabled (no STRIPE_WEBHOOK_SECRET)")
+
+    # Handle the event
+    event_type = event.get('type')
+    logger.info(f"Received Stripe webhook: {event_type}")
+
+    if event_type == 'checkout.session.completed':
+        # Payment successful - activate premium
+        session = event['data']['object']
+
+        # Extract LINE user ID from metadata
+        # When creating payment link, we should include LINE user ID in metadata
+        metadata = session.get('metadata', {})
+        line_user_id = metadata.get('line_user_id')
+        customer_email = session.get('customer_email')
+
+        logger.info(f"Payment completed - LINE User: {line_user_id}, Email: {customer_email}")
+
+        if line_user_id:
+            # Find user mapping
+            mapping = db.query(LineUserMapping).filter(
+                LineUserMapping.line_user_id == line_user_id
+            ).first()
+
+            if mapping:
+                # Activate premium for 1 month
+                now = datetime.utcnow()
+                expiry = now + timedelta(days=30)
+
+                mapping.is_premium = True
+                mapping.premium_expires_at = expiry
+                db.commit()
+
+                logger.info(f"Activated premium for user {line_user_id} until {expiry}")
+
+                # Send confirmation message via LINE
+                try:
+                    confirmation_message = f"""🎉 恭喜！Premium 訂閱已啟用！
+
+✨ 您現在可以享受無限訊息
+📅 有效期至：{expiry.strftime('%Y-%m-%d')}
+
+感謝您的支持！💕"""
+
+                    line_client.push_message(line_user_id, confirmation_message)
+                    logger.info(f"Sent premium confirmation to {line_user_id}")
+                except Exception as e:
+                    logger.error(f"Failed to send premium confirmation message: {e}")
+            else:
+                logger.warning(f"No mapping found for LINE user {line_user_id}")
+        else:
+            logger.warning("No LINE user ID in payment metadata")
+
+    elif event_type == 'customer.subscription.deleted':
+        # Subscription cancelled - deactivate premium
+        subscription = event['data']['object']
+        metadata = subscription.get('metadata', {})
+        line_user_id = metadata.get('line_user_id')
+
+        if line_user_id:
+            mapping = db.query(LineUserMapping).filter(
+                LineUserMapping.line_user_id == line_user_id
+            ).first()
+
+            if mapping:
+                mapping.is_premium = False
+                mapping.premium_expires_at = None
+                db.commit()
+
+                logger.info(f"Deactivated premium for user {line_user_id}")
+
+                # Notify user
+                try:
+                    message = """您的 Premium 訂閱已結束
+
+💬 您現在回到免費方案 (每天 20 則訊息)
+
+隨時歡迎您重新訂閱！💕"""
+                    line_client.push_message(line_user_id, message)
+                except Exception as e:
+                    logger.error(f"Failed to send cancellation message: {e}")
+
+    else:
+        logger.info(f"Unhandled Stripe event type: {event_type}")
+
+    return JSONResponse({"status": "success"}, status_code=200)
 
 
 # ==================== Phase 2: Persistent Conversation Endpoints ====================
