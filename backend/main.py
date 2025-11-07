@@ -644,7 +644,9 @@ async def create_character_v2(
         # Get character picture - use premade picture if provided, otherwise random based on gender
         if user_profile.premade_character_picture:
             # Use specific picture for premade character
-            character_picture = f"/pictures/{character.gender}/{user_profile.premade_character_picture}"
+            # Map Chinese gender to English folder name
+            gender_folder = "female" if character.gender == "女" else "male"
+            character_picture = f"/pictures/{gender_folder}/{user_profile.premade_character_picture}"
         else:
             # Get random picture based on gender
             character_picture = picture_manager.get_random_picture(character.gender)

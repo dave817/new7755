@@ -458,8 +458,13 @@ class CharacterGenerator:
             Dictionary with character settings ready for API
         """
         personality_type = self._determine_personality_type(user_profile.dream_type)
-        # Use user preference to determine character gender
-        gender = user_profile.user_preference if user_profile.user_preference != "都可以" else self._determine_gender(user_profile.dream_type)
+
+        # Check if this is premade character 覓甯 - force female gender
+        if user_profile.preferred_character_name == "覓甯":
+            gender = "女"
+        else:
+            # Use user preference to determine character gender
+            gender = user_profile.user_preference if user_profile.user_preference != "都可以" else self._determine_gender(user_profile.dream_type)
 
         # Use user-provided character name if available, otherwise generate one
         name = user_profile.preferred_character_name if user_profile.preferred_character_name else self._generate_name(personality_type, gender)
