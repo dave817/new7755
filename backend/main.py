@@ -594,20 +594,12 @@ async def create_character_v2(
         # Extract LINE user ID from profile if present
         line_user_id = user_profile.line_user_id
 
-        # ========== LINE INTEGRATION: Check character limit ==========
+        # ========== LINE INTEGRATION: Get existing mapping if any ==========
+        existing_mapping = None
         if line_user_id:
-            # Check if LINE user already has a character (1 character per user rule)
             existing_mapping = db.query(LineUserMapping).filter(
                 LineUserMapping.line_user_id == line_user_id
             ).first()
-
-            if existing_mapping and existing_mapping.character_id:
-                # User already has a character - enforce limit
-                logger.warning(f"LINE user {line_user_id} already has character {existing_mapping.character_id}")
-                raise HTTPException(
-                    status_code=400,
-                    detail="你已經有專屬伴侶了！每位用戶只能擁有一個AI角色。如果想要重新開始，請聯繫客服。"
-                )
 
         # Initialize conversation manager
         conv_manager = ConversationManager(db, api_client)
@@ -711,6 +703,120 @@ async def create_character_v2(
     except Exception as e:
         logger.error(f"Error creating character: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"角色創建失敗: {str(e)}")
+
+
+@app.get("/api/v2/characters")
+async def get_characters(
+    line_user_id: str,
+    db: Session = Depends(get_db)
+) -> Dict:
+    """
+    Get all characters for a LINE user
+
+    Args:
+        line_user_id: LINE user ID
+        db: Database session
+
+    Returns:
+        List of characters with active character marked
+    """
+    try:
+        # Get LINE user mapping
+        mapping = db.query(LineUserMapping).filter(
+            LineUserMapping.line_user_id == line_user_id
+        ).first()
+
+        if not mapping:
+            return {
+                "success": True,
+                "characters": [],
+                "active_character_id": None
+            }
+
+        # Get all characters for this user
+        characters = db.query(Character).filter(
+            Character.user_id == mapping.user_id
+        ).order_by(Character.created_at.desc()).all()
+
+        character_list = []
+        for char in characters:
+            # Get character picture
+            picture = picture_manager.get_random_picture(char.gender)
+
+            character_list.append({
+                "character_id": char.character_id,
+                "name": char.name,
+                "gender": char.gender,
+                "identity": char.identity,
+                "picture": picture,
+                "created_at": char.created_at.isoformat() if char.created_at else None
+            })
+
+        return {
+            "success": True,
+            "characters": character_list,
+            "active_character_id": mapping.character_id
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting characters: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"獲取角色列表失敗: {str(e)}")
+
+
+class SetActiveCharacterRequest(BaseModel):
+    line_user_id: str
+    character_id: int
+
+
+@app.post("/api/v2/set-active-character")
+async def set_active_character(
+    request: SetActiveCharacterRequest,
+    db: Session = Depends(get_db)
+) -> Dict:
+    """
+    Set the active character for a LINE user
+
+    Args:
+        request: Contains line_user_id and character_id
+        db: Database session
+
+    Returns:
+        Success status
+    """
+    try:
+        # Get LINE user mapping
+        mapping = db.query(LineUserMapping).filter(
+            LineUserMapping.line_user_id == request.line_user_id
+        ).first()
+
+        if not mapping:
+            raise HTTPException(status_code=404, detail="找不到用戶")
+
+        # Verify character belongs to this user
+        character = db.query(Character).filter(
+            Character.character_id == request.character_id,
+            Character.user_id == mapping.user_id
+        ).first()
+
+        if not character:
+            raise HTTPException(status_code=404, detail="找不到角色或角色不屬於此用戶")
+
+        # Update active character
+        mapping.character_id = request.character_id
+        db.commit()
+
+        logger.info(f"Set active character {request.character_id} for LINE user {request.line_user_id}")
+
+        return {
+            "success": True,
+            "message": f"已切換到角色：{character.name}"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting active character: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"切換角色失敗: {str(e)}")
 
 
 class SendMessageRequest(BaseModel):
@@ -2110,6 +2216,12 @@ async def ui2(lineUserId: Optional[str] = None):
                         alert('請選擇你喜歡的性別');
                         return;
                     }
+
+                    // If premade character selected, skip to character generation
+                    if (usePremadeCharacter) {
+                        generateCharacter();
+                        return;
+                    }
                 }
 
                 document.getElementById('step' + currentStep).classList.remove('active');
@@ -2132,6 +2244,123 @@ async def ui2(lineUserId: Optional[str] = None):
                     }
                 }
                 return traits;
+            }
+
+            async function loadCharacterManagement() {
+                // Show loading
+                document.getElementById('successMessage').innerHTML = '<div class="loading">載入中...</div>';
+
+                try {
+                    // Fetch all characters
+                    const response = await fetch(`/api/v2/characters?line_user_id=${LINE_USER_ID}`);
+                    const data = await response.json();
+
+                    if (!data.success) {
+                        alert('無法載入角色列表');
+                        return;
+                    }
+
+                    const characters = data.characters;
+                    const activeCharacterId = data.active_character_id;
+
+                    // Build character cards HTML
+                    let charactersHTML = '';
+                    if (characters.length > 0) {
+                        charactersHTML = characters.map(char => {
+                            const isActive = char.character_id === activeCharacterId;
+                            const activeLabel = isActive ? '<div style="background: #10b981; color: white; padding: 5px 10px; border-radius: 5px; font-size: 14px; margin-bottom: 10px;">✓ 目前聊天對象</div>' : '';
+                            const buttonText = isActive ? '目前對話中' : '切換到此角色';
+                            const buttonStyle = isActive ? 'background: #9ca3af; cursor: not-allowed;' : 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); cursor: pointer;';
+                            const buttonDisabled = isActive ? 'disabled' : '';
+
+                            return `
+                                <div style="border: 2px solid ${isActive ? '#10b981' : '#e5e7eb'}; border-radius: 15px; padding: 20px; margin-bottom: 20px; background: white;">
+                                    ${activeLabel}
+                                    <div style="display: flex; align-items: center; gap: 20px;">
+                                        <img src="${char.picture}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" onerror="this.src='/pictures/default.png'">
+                                        <div style="flex: 1;">
+                                            <h3 style="margin: 0 0 5px 0; font-size: 20px; color: #333;">${char.name}</h3>
+                                            <p style="margin: 0; color: #666; font-size: 14px;">${char.identity || char.gender}</p>
+                                        </div>
+                                        <button
+                                            onclick="setActiveCharacter(${char.character_id})"
+                                            ${buttonDisabled}
+                                            style="${buttonStyle} color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px;">
+                                            ${buttonText}
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        charactersHTML = '<p style="color: #666;">目前還沒有角色</p>';
+                    }
+
+                    // Display character management screen
+                    document.getElementById('successMessage').innerHTML = `
+                        <div class="success-container">
+                            <h2 style="color: #333; margin-bottom: 20px;">我的AI伴侶</h2>
+
+                            <div style="max-width: 600px; margin: 0 auto;">
+                                ${charactersHTML}
+                            </div>
+
+                            <button onclick="createNewCharacter()" style="margin-top: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 15px 30px; border-radius: 10px; font-size: 16px; cursor: pointer;">
+                                + 創建新角色
+                            </button>
+
+                            <div class="line-notice" style="margin-top: 30px;">
+                                <h3>請回到LINE開始聊天！</h3>
+                                <p>
+                                    所有聊天都在LINE進行<br>
+                                    現在就打開LINE看看你的專屬伴侶吧！
+                                </p>
+                                <div class="features-box">
+                                    <p>
+                                        💬 每天免費 20 則訊息<br>
+                                        💎 Premium ($9.99/月) 享無限訊息
+                                    </p>
+                                </div>
+                            </div>
+
+                            <p style="font-size: 14px; color: #999; margin-top: 20px;">你可以關閉這個視窗了</p>
+                        </div>
+                    `;
+                } catch (error) {
+                    alert('載入角色失敗：' + error.message);
+                }
+            }
+
+            async function setActiveCharacter(characterId) {
+                try {
+                    const response = await fetch('/api/v2/set-active-character', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            line_user_id: LINE_USER_ID,
+                            character_id: characterId
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        // Reload character management to show updated active status
+                        await loadCharacterManagement();
+                    } else {
+                        alert('切換失敗');
+                    }
+                } catch (error) {
+                    alert('發生錯誤：' + error.message);
+                }
+            }
+
+            function createNewCharacter() {
+                // Reset and go back to character selection
+                usePremadeCharacter = false;
+                currentStep = 0;
+                document.getElementById('step4').classList.remove('active');
+                document.getElementById('step0').classList.add('active');
             }
 
             async function generateCharacter() {
@@ -2228,35 +2457,8 @@ async def ui2(lineUserId: Optional[str] = None):
                     console.log('✅ Character created:', data);
 
                     if (data.success) {
-                        // Show success message - direct user back to LINE
-                        document.getElementById('successMessage').innerHTML = `
-                            <div class="success-container">
-                                <div class="success-emoji">✅</div>
-                                <h1 class="success-title">設定完成！</h1>
-                                <p style="font-size: 20px; margin-bottom: 15px; color: #333;">
-                                    你的專屬伴侶 <strong style="color: #667eea;">${data.character.name}</strong> 已經準備好了~ 💕
-                                </p>
-                                <p style="font-size: 18px; margin-bottom: 40px; color: #666;">
-                                    角色照片和第一則訊息已發送到LINE！
-                                </p>
-
-                                <div class="line-notice">
-                                    <h3>🔥 請回到LINE開始聊天！</h3>
-                                    <p>
-                                        所有聊天都在LINE進行<br>
-                                        現在就打開LINE看看你的專屬伴侶吧！
-                                    </p>
-                                    <div class="features-box">
-                                        <p>
-                                            💬 每天免費 20 則訊息<br>
-                                            💎 Premium ($9.99/月) 享無限訊息
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <p style="font-size: 16px; color: #999;">你可以關閉這個視窗了</p>
-                            </div>
-                        `;
+                        // Character created successfully, now show character management screen
+                        await loadCharacterManagement();
                     } else {
                         alert('生成失敗：' + data.message);
                     }
@@ -2264,6 +2466,27 @@ async def ui2(lineUserId: Optional[str] = None):
                     alert('發生錯誤：' + error.message);
                 }
             }
+
+            // Initialize page - check if user has existing characters
+            async function initPage() {
+                try {
+                    const response = await fetch(`/api/v2/characters?line_user_id=${LINE_USER_ID}`);
+                    const data = await response.json();
+
+                    if (data.success && data.characters.length > 0) {
+                        // User has characters, show character management screen
+                        nextStep(4); // Go to step 4 (success/management screen)
+                        await loadCharacterManagement();
+                    }
+                    // Otherwise, stay on step 0 (character selection screen)
+                } catch (error) {
+                    console.error('Failed to load characters:', error);
+                    // On error, stay on character selection screen
+                }
+            }
+
+            // Run initialization when page loads
+            window.addEventListener('DOMContentLoaded', initPage);
         </script>
     </body>
     </html>
