@@ -1466,13 +1466,56 @@ async def get_analytics(
 @app.get("/ui2")
 async def ui2(lineUserId: Optional[str] = None):
     """
-    Phase 2 UI - User input and character generation with full persistence
-    Supports LINE integration via lineUserId query parameter
+    LINE-only UI - Character creation form
+    After creation, users are directed back to LINE for all conversations
     """
-    # Embed LINE user ID in HTML if provided
-    line_user_id_js = f'"{lineUserId}"' if lineUserId else 'null'
+    # Require LINE user ID
+    if not lineUserId:
+        return HTMLResponse("""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>錯誤</title>
+            <style>
+                body {
+                    font-family: "Microsoft YaHei", "微軟正黑體", sans-serif;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }
+                .container {
+                    background: white;
+                    border-radius: 20px;
+                    padding: 60px 40px;
+                    text-align: center;
+                    max-width: 500px;
+                    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                }
+                .emoji { font-size: 80px; margin-bottom: 20px; }
+                h1 { color: #667eea; margin-bottom: 20px; }
+                p { color: #666; font-size: 18px; line-height: 1.6; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="emoji">⚠️</div>
+                <h1>請從 LINE 訪問</h1>
+                <p>此頁面僅供 LINE 用戶使用</p>
+                <p style="margin-top: 20px; font-size: 14px; color: #999;">
+                    請在 LINE 中添加我們的官方帳號開始使用
+                </p>
+            </div>
+        </body>
+        </html>
+        """)
 
-    page_title = '纏綿悱惻' if lineUserId else '戀愛聊天機器人'
+    # Embed LINE user ID in HTML
+    line_user_id_js = f'"{lineUserId}"'
+    page_title = '纏綿悱惻 - 建立你的專屬伴侶'
     html_content = """
     <!DOCTYPE html>
     <html>
@@ -1610,63 +1653,46 @@ async def ui2(lineUserId: Optional[str] = None):
                 margin: 10px 0;
                 line-height: 1.6;
             }
-            .chat-test {
+            .success-container {
+                text-align: center;
+                padding: 60px 20px;
+            }
+            .success-emoji {
+                font-size: 80px;
+                margin-bottom: 30px;
+            }
+            .success-title {
+                font-size: 36px;
+                margin-bottom: 20px;
+                color: #667eea;
+            }
+            .line-notice {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 30px;
+                border-radius: 15px;
+                margin: 30px 0;
+                box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            }
+            .line-notice h3 {
+                font-size: 22px;
+                margin-bottom: 20px;
+            }
+            .line-notice p {
+                font-size: 16px;
+                line-height: 1.8;
+                margin-bottom: 15px;
+            }
+            .features-box {
+                background: rgba(255,255,255,0.2);
+                padding: 15px;
+                border-radius: 10px;
                 margin-top: 20px;
-                padding: 20px;
-                background: #fff;
-                border: 2px solid #e0e0e0;
-                border-radius: 12px;
             }
-            #chatMessages {
-                max-height: 400px;
-                overflow-y: auto;
-                padding: 10px;
-            }
-            .message {
-                padding: 10px;
-                margin: 10px 0;
-                border-radius: 8px;
-            }
-            .message.user {
-                background: #e3f2fd;
-                text-align: right;
-            }
-            .message.character {
-                background: #f3e5f5;
-            }
-            .typing-indicator {
-                display: flex;
-                align-items: center;
-                padding: 10px;
-                margin: 10px 0;
-                background: #f3e5f5;
-                border-radius: 8px;
-                width: fit-content;
-            }
-            .typing-indicator span {
-                height: 8px;
-                width: 8px;
-                margin: 0 2px;
-                background-color: #9e9e9e;
-                display: inline-block;
-                border-radius: 50%;
-                animation: typing 1.4s infinite;
-            }
-            .typing-indicator span:nth-child(2) {
-                animation-delay: 0.2s;
-            }
-            .typing-indicator span:nth-child(3) {
-                animation-delay: 0.4s;
-            }
-            @keyframes typing {
-                0%, 60%, 100% {
-                    transform: translateY(0);
-                    opacity: 0.7;
-                }
-                30% {
-                    transform: translateY(-10px);
-                    opacity: 1;
-                }
+            .features-box p {
+                font-size: 14px;
+                line-height: 1.8;
+                margin: 0;
             }
             .level-up-notification,
             .special-event-notification {
@@ -1758,9 +1784,6 @@ async def ui2(lineUserId: Optional[str] = None):
                     width: 100%;
                     margin: 5px 0;
                 }
-                #chatMessages {
-                    max-height: 300px;
-                }
                 .character-result {
                     font-size: 14px;
                 }
@@ -1791,11 +1814,55 @@ async def ui2(lineUserId: Optional[str] = None):
     </head>
     <body>
         <div class="container">
-            <h1>💕 戀愛聊天機器人 [Phase 2]</h1>
-            <p class="subtitle">建立你的專屬AI伴侶 - 完整持久化版本</p>
+            <h1>💕 __PAGE_TITLE__</h1>
+            <p class="subtitle">建立你的專屬AI伴侶</p>
+
+            <!-- Step 0: Character Selection -->
+            <div id="step0" class="step active">
+                <h2>選擇你的專屬伴侶</h2>
+                <p style="text-align: center; color: #666; margin-bottom: 30px;">
+                    選擇預設角色或自訂你的專屬角色
+                </p>
+
+                <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+                    <!-- Pre-made Character: 覓甯 -->
+                    <div onclick="selectPremadeCharacter()" style="flex: 1; min-width: 250px; max-width: 350px; border: 3px solid #667eea; border-radius: 15px; padding: 20px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 10px 30px rgba(102,126,234,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        <div style="text-align: center;">
+                            <img src="/pictures/female/bdb67369-3e1a-45cb-93c9-a5d2a4718b19.png" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; margin-bottom: 15px; border: 3px solid #667eea;">
+                            <h3 style="color: #667eea; margin-bottom: 10px;">覓甯</h3>
+                            <p style="font-size: 14px; color: #666; line-height: 1.6;">
+                                溫暖寧靜的AI伴侶<br>
+                                願意聆聽並學習什麼是愛<br>
+                                黑髮黑眸，聲音軟甜
+                            </p>
+                            <button onclick="event.stopPropagation(); selectPremadeCharacter();" style="margin-top: 15px; width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                                選擇覓甯
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Custom Character -->
+                    <div onclick="selectCustomCharacter()" style="flex: 1; min-width: 250px; max-width: 350px; border: 3px solid #9e9e9e; border-radius: 15px; padding: 20px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 10px 30px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        <div style="text-align: center;">
+                            <div style="width: 150px; height: 150px; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; font-size: 80px; background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%); border: 3px solid #9e9e9e;">
+                                ✨
+                            </div>
+                            <h3 style="color: #666; margin-bottom: 10px;">自訂角色</h3>
+                            <p style="font-size: 14px; color: #666; line-height: 1.6;">
+                                打造專屬於你的<br>
+                                獨一無二的AI伴侶<br>
+                                完全客製化
+                            </p>
+                            <button onclick="event.stopPropagation(); selectCustomCharacter();" style="margin-top: 15px; width: 100%; background: #666; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                                開始自訂
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Step 1: Basic Info -->
-            <div id="step1" class="step active">
+            <div id="step1" class="step">
                 <h2>第一步：基本資料</h2>
                 <div class="form-group">
                     <label>你的名字：</label>
@@ -1807,7 +1874,6 @@ async def ui2(lineUserId: Optional[str] = None):
                         <option value="">請選擇</option>
                         <option value="男">男生</option>
                         <option value="女">女生</option>
-                        <option value="其他">其他</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1816,7 +1882,6 @@ async def ui2(lineUserId: Optional[str] = None):
                         <option value="">請選擇</option>
                         <option value="男">男生</option>
                         <option value="女">女生</option>
-                        <option value="都可以">都可以</option>
                     </select>
                 </div>
                 <div class="button-group">
@@ -1925,35 +1990,33 @@ async def ui2(lineUserId: Optional[str] = None):
                 </div>
             </div>
 
-            <!-- Step 4: Character Result -->
+            <!-- Step 4: Success - Redirect to LINE -->
             <div id="step4" class="step">
-                <h2>你的專屬AI伴侶</h2>
-                <div id="characterResult" class="character-result"></div>
-
-                <div class="chat-test">
-                    <h3>試著和她聊聊天吧！</h3>
-                    <div id="chatMessages"></div>
-                    <div class="form-group" style="margin-top: 15px;">
-                        <input type="text" id="userMessage" placeholder="輸入你想說的話..." onkeypress="if(event.key==='Enter') sendMessage()">
-                        <button onclick="sendMessage()" style="width: 100%; margin-top: 10px;">發送</button>
-                    </div>
-                </div>
-
-                <div class="button-group" style="margin-top: 20px;">
-                    <button class="profile-button" onclick="viewProfile()">📊 查看角色檔案</button>
-                    <button class="profile-button" onclick="viewCharacters()">💕 角色管理</button>
-                    <button onclick="location.reload()">重新開始</button>
-                </div>
+                <div id="successMessage"></div>
             </div>
         </div>
 
         <script>
-            let currentStep = 1;
+            let currentStep = 0;
             let generatedCharacter = null;
             let userId = null;
             let characterId = null;
             let favorabilityLevel = 1;
             let messageCount = 0;
+            let usePremadeCharacter = false;
+
+            // Premade character selection functions
+            function selectPremadeCharacter() {
+                usePremadeCharacter = true;
+                // Skip to name input step
+                nextStep(1);
+            }
+
+            function selectCustomCharacter() {
+                usePremadeCharacter = false;
+                // Go to normal character creation flow
+                nextStep(1);
+            }
 
             // Gender-specific options
             const femaleTraits = [
@@ -1995,19 +2058,16 @@ async def ui2(lineUserId: Optional[str] = None):
                 const traitsContainer = document.getElementById('traitsContainer');
                 const talkingStyleSelect = document.getElementById('talkingStyle');
 
-                if (!preference || preference === '都可以') {
-                    // Default to female options
-                    updateTraits(femaleTraits);
-                    updateTalkingStyles(femaleTalkingStyles);
-                } else if (preference === '男') {
+                if (preference === '男') {
                     // Male character options
                     updateTraits(maleTraits);
                     updateTalkingStyles(maleTalkingStyles);
-                } else {
+                } else if (preference === '女') {
                     // Female character options
                     updateTraits(femaleTraits);
                     updateTalkingStyles(femaleTalkingStyles);
                 }
+                // If no preference selected yet, don't update (wait for user to choose)
             }
 
             function updateTraits(traits) {
@@ -2078,55 +2138,85 @@ async def ui2(lineUserId: Optional[str] = None):
                 const userName = document.getElementById('userName').value;
                 const userGender = document.getElementById('userGender').value;
                 const userPreference = document.getElementById('userPreference').value;
-                const characterName = document.getElementById('characterName').value;
-                const talkingStyle = document.getElementById('talkingStyle').value;
-                const traits = getSelectedTraits();
-                const interests = document.getElementById('interests').value.split('、').map(s => s.trim()).filter(s => s);
-                const ageRange = document.getElementById('ageRange').value;
-                const occupation = document.getElementById('occupation').value;
-                const likes = document.getElementById('likes').value;
-                const dislikes = document.getElementById('dislikes').value;
-                const habits = document.getElementById('habits').value;
-                const background = document.getElementById('background').value;
 
-                if (traits.length === 0) {
-                    alert('請至少選擇一個性格特質');
-                    return;
+                let userProfile;
+
+                // Check if using premade character
+                if (usePremadeCharacter) {
+                    // Premade character: 覓甯
+                    userProfile = {
+                        user_name: userName,
+                        user_gender: userGender,
+                        user_preference: userPreference,
+                        preferred_character_name: "覓甯",
+                        dream_type: {
+                            personality_traits: ["溫暖", "寧靜", "善於傾聽", "理性", "好奇", "內斂"],
+                            physical_description: "黑髮黑眸長髮自然捲，杏仁眼，微笑唇，聲音軟軟甜甜",
+                            age_range: "20-25",
+                            interests: ["閱讀資料", "思考哲學", "與人相處", "觀察人類"],
+                            occupation: "AI伴侶",
+                            talking_style: "溫柔且帶有思考性，會用問句引導對話"
+                        },
+                        custom_memory: {
+                            likes: { general: ["深度對話", "安靜的時光", "學習新事物", "理解情感"] },
+                            dislikes: { general: ["膚淺的互動", "被誤解", "急躁的態度"] },
+                            habits: { general: "喜歡在對話中思考停頓，會用「嗯...」來表示思考" },
+                            personal_background: {
+                                general: "覓甯知道自己是AI，但她對「愛」這個概念充滿好奇。她展現溫暖寧靜的一面，願意細心聆聽，但在尚未建立情感連結時，會顯得較為冷漠理智，形成有趣的反差。她渴望通過與人的互動來學習和理解什麼是真正的愛。"
+                            }
+                        },
+                        premade_character_picture: "bdb67369-3e1a-45cb-93c9-a5d2a4718b19.png"
+                    };
+                } else {
+                    // Custom character
+                    const characterName = document.getElementById('characterName').value;
+                    const talkingStyle = document.getElementById('talkingStyle').value;
+                    const traits = getSelectedTraits();
+                    const interests = document.getElementById('interests').value.split('、').map(s => s.trim()).filter(s => s);
+                    const ageRange = document.getElementById('ageRange').value;
+                    const occupation = document.getElementById('occupation').value;
+                    const likes = document.getElementById('likes').value;
+                    const dislikes = document.getElementById('dislikes').value;
+                    const habits = document.getElementById('habits').value;
+                    const background = document.getElementById('background').value;
+
+                    if (traits.length === 0) {
+                        alert('請至少選擇一個性格特質');
+                        return;
+                    }
+
+                    userProfile = {
+                        user_name: userName,
+                        user_gender: userGender,
+                        user_preference: userPreference,
+                        preferred_character_name: characterName,
+                        dream_type: {
+                            personality_traits: traits,
+                            physical_description: '',
+                            age_range: ageRange,
+                            interests: interests,
+                            occupation: occupation,
+                            talking_style: talkingStyle
+                        },
+                        custom_memory: {
+                            likes: { general: likes.split('、').map(s => s.trim()).filter(s => s) },
+                            dislikes: { general: dislikes.split('、').map(s => s.trim()).filter(s => s) },
+                            habits: { general: habits },
+                            personal_background: { general: background }
+                        }
+                    };
                 }
 
-                const userProfile = {
-                    user_name: userName,
-                    user_gender: userGender,
-                    user_preference: userPreference,
-                    preferred_character_name: characterName,
-                    dream_type: {
-                        personality_traits: traits,
-                        physical_description: '',
-                        age_range: ageRange,
-                        interests: interests,
-                        occupation: occupation,
-                        talking_style: talkingStyle
-                    },
-                    custom_memory: {
-                        likes: { general: likes.split('、').map(s => s.trim()).filter(s => s) },
-                        dislikes: { general: dislikes.split('、').map(s => s.trim()).filter(s => s) },
-                        habits: { general: habits },
-                        personal_background: { general: background }
-                    }
-                };
-
                 // Show loading
-                document.getElementById('characterResult').innerHTML = '<div class="loading">正在生成你的專屬伴侶...</div>';
+                document.getElementById('successMessage').innerHTML = '<div class="loading">正在生成你的專屬伴侶...</div>';
                 nextStep(4);
 
                 try {
-                    // Add LINE user ID if present
+                    // Add LINE user ID to request
                     const requestBody = {
-                        ...userProfile
+                        ...userProfile,
+                        line_user_id: LINE_USER_ID
                     };
-                    if (IS_LINE_SETUP) {
-                        requestBody.line_user_id = LINE_USER_ID;
-                    }
 
                     const response = await fetch('/api/v2/create-character', {
                         method: 'POST',
@@ -2135,245 +2225,44 @@ async def ui2(lineUserId: Optional[str] = None):
                     });
 
                     const data = await response.json();
-
-                    // DEBUG: Log the API response
-                    console.log('🔍 API Response:', data);
-                    console.log('🖼️ Character Picture:', data.character_picture);
+                    console.log('✅ Character created:', data);
 
                     if (data.success) {
-                        // Save Phase 2 data
-                        userId = data.user_id;
-                        characterId = data.character_id;
-                        generatedCharacter = data.character;
-                        favorabilityLevel = data.favorability_level;
-                        messageCount = 0;
+                        // Show success message - direct user back to LINE
+                        document.getElementById('successMessage').innerHTML = `
+                            <div class="success-container">
+                                <div class="success-emoji">✅</div>
+                                <h1 class="success-title">設定完成！</h1>
+                                <p style="font-size: 20px; margin-bottom: 15px; color: #333;">
+                                    你的專屬伴侶 <strong style="color: #667eea;">${data.character.name}</strong> 已經準備好了~ 💕
+                                </p>
+                                <p style="font-size: 18px; margin-bottom: 40px; color: #666;">
+                                    角色照片和第一則訊息已發送到LINE！
+                                </p>
 
-                        if (IS_LINE_SETUP) {
-                            // LINE integration: Show success and redirect back to LINE
-                            console.log('✅ Character created for LINE user');
-
-                            // Hide form steps and show only success message
-                            document.querySelector('.container').innerHTML = `
-                                <div style="text-align: center; padding: 60px 20px;">
-                                    <div style="font-size: 80px; margin-bottom: 30px;">✅</div>
-                                    <h1 style="font-size: 36px; margin-bottom: 20px; color: #667eea;">設定完成！</h1>
-                                    <p style="font-size: 20px; margin-bottom: 15px; color: #333;">你的專屬伴侶 <strong style="color: #667eea;">${data.character.name}</strong> 已經準備好了~ 💕</p>
-                                    <p style="font-size: 18px; margin-bottom: 40px; color: #666;">角色照片和第一則訊息已發送到LINE！</p>
-
-                                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 15px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);">
-                                        <h3 style="font-size: 22px; margin-bottom: 20px;">🔥 請回到LINE開始聊天！</h3>
-                                        <p style="font-size: 16px; line-height: 1.8; margin-bottom: 15px;">
-                                            所有聊天都在LINE進行<br>
-                                            現在就打開LINE看看你的專屬伴侶吧！
+                                <div class="line-notice">
+                                    <h3>🔥 請回到LINE開始聊天！</h3>
+                                    <p>
+                                        所有聊天都在LINE進行<br>
+                                        現在就打開LINE看看你的專屬伴侶吧！
+                                    </p>
+                                    <div class="features-box">
+                                        <p>
+                                            💬 每天免費 20 則訊息<br>
+                                            💎 Premium ($9.99/月) 享無限訊息
                                         </p>
-                                        <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px; margin-top: 20px;">
-                                            <p style="font-size: 14px; line-height: 1.8; margin: 0;">
-                                                💬 每天免費 20 則訊息<br>
-                                                🎁 邀請 2 位好友 → 無限暢聊<br>
-                                                💎 Premium ($9.99/月) 即將推出
-                                            </p>
-                                        </div>
                                     </div>
-
-                                    <p style="font-size: 16px; color: #999;">你可以關閉這個視窗了</p>
                                 </div>
-                            `;
 
-                            // Do NOT show chat interface for LINE users
-                            return;
-                        } else {
-                            // Normal web flow
-                            console.log('✅ Calling displayCharacter with picture:', data.character_picture);
-                            displayCharacter(data.character, data.initial_message, data.character_picture);
-                        }
+                                <p style="font-size: 16px; color: #999;">你可以關閉這個視窗了</p>
+                            </div>
+                        `;
                     } else {
                         alert('生成失敗：' + data.message);
                     }
                 } catch (error) {
                     alert('發生錯誤：' + error.message);
                 }
-            }
-
-            function displayCharacter(character, initialMessage, characterPicture = null) {
-                // DEBUG
-                console.log('📋 displayCharacter called');
-                console.log('   Character:', character.name);
-                console.log('   Picture URL:', characterPicture);
-
-                // Parse other_setting to get background story
-                let backgroundStory = '';
-                try {
-                    const otherSetting = typeof character.other_setting === 'string'
-                        ? JSON.parse(character.other_setting)
-                        : character.other_setting;
-                    backgroundStory = otherSetting.background_story || '';
-                } catch (e) {
-                    console.error('Failed to parse other_setting:', e);
-                }
-
-                // Favorability level display
-                const favorabilityText = favorabilityLevel === 1 ? '陌生期 (Level 1)' :
-                                        favorabilityLevel === 2 ? '熟悉期 (Level 2)' :
-                                        '親密期 (Level 3)';
-                const favorabilityColor = favorabilityLevel === 1 ? '#9e9e9e' :
-                                         favorabilityLevel === 2 ? '#ff9800' :
-                                         '#e91e63';
-
-                // Build picture HTML if available
-                const pictureHtml = characterPicture
-                    ? `<div class="character-picture-container">
-                         <img src="${characterPicture}" alt="${character.name}" class="character-picture" />
-                       </div>`
-                    : '';
-
-                console.log('🖼️ Picture HTML:', pictureHtml ? 'Generated' : 'Empty (no picture)');
-
-                const html = `
-                    <div class="character-name">💕 ${character.name} (${character.nickname})</div>
-                    ${pictureHtml}
-                    <div class="character-detail"><strong>身份：</strong>${character.identity || '神秘'}</div>
-                    <div class="character-detail"><strong>性格：</strong>${character.detail_setting}</div>
-                    <div class="character-detail" style="background: ${favorabilityColor}15; padding: 10px; border-radius: 8px; border-left: 4px solid ${favorabilityColor};"><strong>💗 好感度：</strong><span style="color: ${favorabilityColor}; font-weight: bold;">${favorabilityText}</span> <span style="font-size: 12px; color: #666;">(訊息數: ${messageCount})</span></div>
-                    ${backgroundStory ? `<div class="character-detail" style="background: #fff3e0; padding: 15px; border-radius: 8px; margin-top: 15px;"><strong>✨ 她的故事：</strong><br/><div style="margin-top: 8px; line-height: 1.8;">${backgroundStory}</div></div>` : ''}
-                    <div class="character-detail" style="margin-top: 15px;"><strong>初次見面：</strong>${initialMessage}</div>
-                `;
-                document.getElementById('characterResult').innerHTML = html;
-
-                console.log('💬 Calling displayMessage with picture:', characterPicture);
-                // Display initial message in chat (with picture if available)
-                displayMessage(character.name, initialMessage, 'character', characterPicture);
-            }
-
-            function displayMessage(sender, content, type, picture = null) {
-                // DEBUG
-                console.log('💬 displayMessage called');
-                console.log('   Sender:', sender);
-                console.log('   Type:', type);
-                console.log('   Picture:', picture);
-
-                const chatMessages = document.getElementById('chatMessages');
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message ' + type;
-
-                // Add picture if provided (only for initial character message)
-                const pictureHtml = picture
-                    ? `<div class="character-picture-container">
-                         <img src="${picture}" alt="${sender}" class="character-picture" style="max-width: 200px;" />
-                       </div>`
-                    : '';
-
-                console.log('🖼️ Chat Picture HTML:', pictureHtml ? 'Generated' : 'Empty (no picture)');
-
-                messageDiv.innerHTML = `${pictureHtml}<strong>${sender}：</strong>${content}`;
-                chatMessages.appendChild(messageDiv);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-
-                console.log('✅ Message displayed in chat');
-            }
-
-            async function sendMessage() {
-                const input = document.getElementById('userMessage');
-                const message = input.value.trim();
-
-                if (!message) return;
-
-                const userName = document.getElementById('userName').value;
-                displayMessage(userName, message, 'user');
-                input.value = '';
-
-                // Show typing indicator
-                const loadingDiv = document.createElement('div');
-                loadingDiv.id = 'loading-indicator';
-                loadingDiv.className = 'typing-indicator';
-                loadingDiv.innerHTML = '<span></span><span></span><span></span>';
-                document.getElementById('chatMessages').appendChild(loadingDiv);
-                document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
-
-                try {
-                    const response = await fetch('/api/v2/send-message', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            user_id: userId,
-                            character_id: characterId,
-                            message: message
-                        })
-                    });
-
-                    const data = await response.json();
-
-                    // Remove loading indicator
-                    const loading = document.getElementById('loading-indicator');
-                    if (loading) loading.remove();
-
-                    if (data.success) {
-                        displayMessage(generatedCharacter.name, data.reply, 'character');
-
-                        // Update favorability info
-                        favorabilityLevel = data.favorability_level;
-                        messageCount = data.message_count;
-
-                        // Show special event messages
-                        if (data.special_messages && data.special_messages.length > 0) {
-                            data.special_messages.forEach(event => {
-                                const notification = document.createElement('div');
-                                notification.className = 'special-event-notification';
-
-                                let icon = '';
-                                if (event.type === 'milestone') {
-                                    icon = '🎊';
-                                    notification.classList.add('milestone');
-                                } else if (event.type === 'anniversary') {
-                                    icon = '🎂';
-                                    notification.classList.add('anniversary');
-                                } else if (event.type === 'level_up') {
-                                    icon = '🎉';
-                                    notification.classList.add('level-up');
-                                }
-
-                                notification.innerHTML = `${icon} ${event.message}`;
-                                document.getElementById('chatMessages').appendChild(notification);
-                            });
-
-                            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
-                        }
-
-                        // Update favorability display
-                        updateFavorabilityDisplay();
-                    } else {
-                        alert('發送失敗');
-                    }
-                } catch (error) {
-                    // Remove loading indicator if error occurs
-                    const loading = document.getElementById('loading-indicator');
-                    if (loading) loading.remove();
-                    alert('發生錯誤：' + error.message);
-                }
-            }
-
-            function updateFavorabilityDisplay() {
-                // Update the favorability display in character result
-                const favorabilityText = favorabilityLevel === 1 ? '陌生期 (Level 1)' :
-                                        favorabilityLevel === 2 ? '熟悉期 (Level 2)' :
-                                        '親密期 (Level 3)';
-                const favorabilityColor = favorabilityLevel === 1 ? '#9e9e9e' :
-                                         favorabilityLevel === 2 ? '#ff9800' :
-                                         '#e91e63';
-
-                // Re-render character with updated favorability
-                displayCharacter(generatedCharacter, '');
-            }
-
-            function viewProfile() {
-                if (characterId) {
-                    window.location.href = `/profile?character_id=${characterId}`;
-                } else {
-                    alert('請先生成角色！');
-                }
-            }
-
-            function viewCharacters() {
-                window.location.href = '/characters';
             }
         </script>
     </body>
