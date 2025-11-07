@@ -629,8 +629,13 @@ async def create_character_v2(
             favorability_level=1
         )
 
-        # Get random character picture based on gender
-        character_picture = picture_manager.get_random_picture(character.gender)
+        # Get character picture - use premade picture if provided, otherwise random based on gender
+        if user_profile.premade_character_picture:
+            # Use specific picture for premade character
+            character_picture = f"/pictures/{character.gender}/{user_profile.premade_character_picture}"
+        else:
+            # Get random picture based on gender
+            character_picture = picture_manager.get_random_picture(character.gender)
 
         # ========== LINE INTEGRATION: Create mapping and send first message ==========
         if line_user_id:
@@ -740,8 +745,11 @@ async def get_characters(
 
         character_list = []
         for char in characters:
-            # Get character picture
-            picture = picture_manager.get_random_picture(char.gender)
+            # Get character picture - use specific picture for premade characters
+            if char.name == "覓甯":
+                picture = "/pictures/女/bdb67369-3e1a-45cb-93c9-a5d2a4718b19.png"
+            else:
+                picture = picture_manager.get_random_picture(char.gender)
 
             character_list.append({
                 "character_id": char.character_id,

@@ -53,6 +53,7 @@ class UserProfile(BaseModel):
     dream_type: DreamType
     custom_memory: CustomMemory
     line_user_id: Optional[str] = Field(None, description="LINE用戶ID (用於LINE Bot集成)")
+    premade_character_picture: Optional[str] = Field(None, description="預設角色的指定圖片檔名")
 
 
 class CharacterSettings(BaseModel):
