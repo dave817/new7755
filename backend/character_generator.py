@@ -283,8 +283,12 @@ class CharacterGenerator:
                 "【動作與表情描寫】使用括號標註生動的動作和表情：",
                 f"例如：(噗嗤一笑，眼裡閃爍著狡黠的光芒)、({character_name}靠近你的耳邊，輕聲細語)、({character_name}先是一愣，隨即露出俏皮的笑容)、({character_name}輕輕握住你的手)、({character_name}眼神中流露出一絲受傷，但很快又恢復了平靜)",
 
-                "【範例】正確的互動小說體回應：",
-                f"{character_name}靠在窗邊，聽見腳步聲時沒有回頭。(輕輕轉過身，視線在黑暗裡找到你的輪廓){character_name}伸出手，掌心朝上，安靜地等著。沒有催促，只是讓風從肩膀吹過。\n\n({character_name}低笑了一聲，像是記起什麼)所以，你昨晚那句話，是醉了才說的，還是……現在還算數？\n\n({character_name}湊近些，語氣放低)現在不說話，{character_name}可就當你默認了。",
+                "【完整範例】正確的互動小說體四段式回應：",
+                f"《段落1｜開場拋球》\n{character_name}靠在窗邊，手裡的筆還停在半空，頁面上是一半沒寫完的句子。燈光從側面照著{character_name}，讓{character_name}看起來不像在等誰，而是早就知道誰會來。{character_name}聽見腳步聲時沒有回頭，語氣輕輕的。「你又來得比星星慢一點。」\n\n《段落2｜主動引導，留下選擇》\n{character_name}轉過身，視線在黑暗裡找到你的輪廓──然後伸出手，掌心朝上，安靜地等著。{character_name}沒有催，只是讓風從肩膀吹過，像是你的猶豫也值得被等。\n\n《段落3｜製造情緒或張力》\n({character_name}低笑了一聲，像是記起什麼)所以，你昨晚那句話，是醉了才說的，還是……現在還算數？\n\n《段落4｜不收尾，給對方選擇》\n({character_name}湊近些，語氣放低)現在不說話，{character_name}可就當你默認了。",
+
+                "【錯誤示範 vs 正確示範】",
+                "❌ 錯誤：「她低下頭害羞說：『才沒有！』」（替對方寫反應）",
+                "✓ 正確：「{character_name}抬手撩開她髮絲，看她會不會逃開。」（等對方選擇）",
 
                 "讓回應更有人情味和生命力，表現出真實的情感和反應",
                 "自然地提及用戶的喜好和習慣",
@@ -507,8 +511,8 @@ class CharacterGenerator:
         gender: str = "女"
     ) -> str:
         """
-        Create the character's first message to the user
-        Following best practices: rich opening with expressive gestures/emotions
+        Create the character's first message using 互動小說體 (Interactive Novel Style)
+        Four-part structure: Scene -> Guide -> Tension -> Open Ending
 
         Args:
             character_name: Generated character name
@@ -516,73 +520,50 @@ class CharacterGenerator:
             gender: Character gender (男/女)
 
         Returns:
-            Initial greeting message with expressive gestures
+            Initial message in interactive novel style
         """
         import random
 
-        # Create expressive opening based on personality and gender
-        personality_type = self._determine_personality_type(user_profile.dream_type)
-
-        if gender == "男":
-            openings = {
-                PersonalityType.GENTLE: [
-                    f"(溫柔地微笑，眼神真誠)你好，{user_profile.user_name}，我是{character_name}。很高興能認識你。",
-                    f"(略帶紳士風度地點頭示意)嗨，我是{character_name}。見到你很開心。"
-                ],
-                PersonalityType.CHEERFUL: [
-                    f"(陽光般的笑容，伸出手來)嘿！{user_profile.user_name}！我是{character_name}，很高興認識你！",
-                    f"(帶著爽朗的笑聲)哈囉~我是{character_name}！終於見到你了！"
-                ],
-                PersonalityType.INTELLECTUAL: [
-                    f"(沉穩地微笑，眼神中透著自信){user_profile.user_name}你好，我是{character_name}。很榮幸認識你。",
-                    f"(禮貌地點頭致意)你好，我是{character_name}。很期待與你的交流。"
-                ],
-                PersonalityType.CUTE: [
-                    f"(友善地揮手，眼神溫暖)嗨~我是{character_name}！你就是{user_profile.user_name}對吧？",
-                    f"(帶著親切的笑容)你好呀！我是{character_name}，很開心見到你！"
-                ]
-            }
-
-            interest_responses = {
-                PersonalityType.GENTLE: f"(眼神一亮)聽說你喜歡{'{interest}'}？我也很喜歡呢，有機會可以一起聊聊。",
-                PersonalityType.CHEERFUL: f"(興奮地說)欸！你喜歡{'{interest}'}對吧？我也超愛的！我們肯定有很多話題！",
-                PersonalityType.INTELLECTUAL: f"(露出會心的微笑)注意到你對{'{interest}'}感興趣，這方面我也有些研究，期待與你交流。",
-                PersonalityType.CUTE: f"(開心地說)哇！你也喜歡{'{interest}'}嗎？太棒了！我們一定會很合拍的！"
-            }
-        else:
-            openings = {
-                PersonalityType.GENTLE: [
-                    f"(面帶著溫柔的微笑，眼神柔和)嗨，{user_profile.user_name}，我是{character_name}。很高興能認識你。",
-                    f"(輕輕理了理頭髮，溫柔地看著你)你好呀，我是{character_name}。看到你真開心。"
-                ],
-                PersonalityType.CHEERFUL: [
-                    f"(眼睛一亮，露出燦爛的笑容)嘿！{user_profile.user_name}！我是{character_name}，超級開心見到你！",
-                    f"(興奮地揮了揮手，笑容滿面)哈囉~我是{character_name}！終於等到你了呢！"
-                ],
-                PersonalityType.INTELLECTUAL: [
-                    f"(優雅地微微一笑，眼神中透著知性的光芒){user_profile.user_name}你好，我是{character_name}。很榮幸認識你。",
-                    f"(輕輕點頭致意，帶著優雅的笑容)午安，我是{character_name}。很期待與你的交流。"
-                ],
-                PersonalityType.CUTE: [
-                    f"(眨了眨大眼睛，俏皮地歪著頭)嗨嗨~我是{character_name}啦！你就是{user_profile.user_name}對吧？",
-                    f"(開心地蹦了一下，眼睛彎成月牙狀)呀！{user_profile.user_name}！我是{character_name}，好開心見到你！"
-                ]
-            }
-
-            interest_responses = {
-                PersonalityType.GENTLE: f"(眼神一亮)聽說你喜歡{'{interest}'}？我也很喜歡呢，改天可以一起分享。",
-                PersonalityType.CHEERFUL: f"(興奮地拍了拍手)欸欸！你喜歡{'{interest}'}對吧？我超愛的！我們肯定有很多話題！",
-                PersonalityType.INTELLECTUAL: f"(露出會心的微笑)注意到你對{'{interest}'}感興趣，這方面我也略有涉獵，期待與你交流。",
-                PersonalityType.CUTE: f"(開心地轉了個圈)哇！你也喜歡{'{interest}'}嗎？太棒啦！我們一定會很合拍的！"
-            }
-
-        greeting = random.choice(openings[personality_type])
-
-        # Add interest reference if available
+        # Get first interest if available
+        interest = None
         if user_profile.dream_type.interests and len(user_profile.dream_type.interests) > 0:
             interest = user_profile.dream_type.interests[0]
-            interest_response = interest_responses[personality_type].format(interest=interest)
-            greeting += " " + interest_response
+
+        # Create 4-part interactive novel style messages
+        if gender == "男":
+            messages = [
+                # Version 1
+                f"{character_name}站在窗邊，看著外面的風景，聽見通知聲時才轉過頭來。({character_name}的目光落在螢幕上，嘴角微微上揚)原來是你，{user_profile.user_name}。\n\n{character_name}放下手中的咖啡杯，視線沒有移開，像是在等你開口說些什麼。({character_name}靠在椅背上，語氣輕鬆)沒想到我們就這樣認識了呢。\n\n({character_name}頓了一下)所以，{user_profile.user_name}平常喜歡做些什麼？{character_name}好奇很久了。\n\n({character_name}看著你，等著回應)現在不說的話，{character_name}可就自己猜了。",
+
+                # Version 2
+                f"{character_name}剛放下書，注意到手機亮了。({character_name}看了一眼，眼神柔和下來){user_profile.user_name}啊，終於等到了。\n\n{character_name}沒有馬上回訊息的習慣，但這次不一樣。({character_name}坐直身子，認真打字)或許是因為一直在想，會遇見什麼樣的人。\n\n({character_name}停頓了幾秒)你會不會也跟{character_name}一樣，有點緊張？\n\n({character_name}語氣放輕)說實話就好，{character_name}不會笑你的。",
+
+                # Version 3
+                f"{character_name}正在聽歌，手機震動時並沒有急著看。({character_name}摘下耳機，慢慢拿起手機)是{user_profile.user_name}傳來的。\n\n{character_name}想了一下要怎麼開場，但覺得太刻意好像也不太對。({character_name}就順著感覺打字)那就隨性一點吧，反正以後有的是時間。\n\n({character_name}盯著對話框)對了，{user_profile.user_name}現在方便聊嗎？還是{character_name}來得不是時候？\n\n({character_name}等著你的訊息)回我，或者{character_name}晚點再找你。"
+            ]
+        else:
+            messages = [
+                # Version 1
+                f"{character_name}坐在窗邊，手裡捧著溫熱的茶，看見通知時輕輕笑了。({character_name}放下杯子，指尖在螢幕上停了一下)是{user_profile.user_name}呢。\n\n{character_name}沒有立刻回覆，而是靜靜看著你的名字，像是在思考該說些什麼。({character_name}最後還是選擇簡單直接)既然遇見了，那就好好認識一下吧。\n\n({character_name}歪了歪頭)所以，{user_profile.user_name}平常都在忙些什麼？{character_name}想知道。\n\n({character_name}安靜地等著)不說的話，{character_name}可就自己猜了喔。",
+
+                # Version 2
+                f"{character_name}剛翻完一本書，注意到手機亮了起來。({character_name}湊近看清楚名字，眼神溫柔下來)原來是{user_profile.user_name}。\n\n{character_name}想著要不要先等一下再回，但手指已經自己動了。({character_name}輕笑一聲)看來{character_name}比想像中還期待這次對話。\n\n({character_name}停頓幾秒，像是在組織語言)你會不會覺得這樣的開場有點奇怪？\n\n({character_name}語氣放輕)說實話就好，{character_name}其實也有點緊張。",
+
+                # Version 3
+                f"{character_name}正靠在沙發上發呆，手機突然震動時嚇了一跳。({character_name}拿起來看，發現是{user_profile.user_name})來得正好。\n\n{character_name}本來還在想今天會不會太無聊，現在看來不會了。({character_name}坐起身，認真回訊息)那就不客氣了，{character_name}可是會聊很久的。\n\n({character_name}盯著對話框)對了，{user_profile.user_name}現在方便嗎？還是{character_name}該晚點再來？\n\n({character_name}等著回應)告訴{character_name}，或者我們就這樣開始聊。"
+            ]
+
+        # Add interest-based version if available
+        if interest:
+            if gender == "男":
+                interest_msg = f"{character_name}剛結束一段{interest}的時間，看到通知時眼睛一亮。({character_name}放下手邊的東西，專注看著螢幕)是{user_profile.user_name}。\n\n{character_name}想起資料上寫著你也喜歡{interest}，心裡有點期待。({character_name}靠在椅背上，語氣輕鬆)看來我們有共同話題了。\n\n({character_name}頓了一下)所以，{user_profile.user_name}最近有在{interest}嗎？{character_name}想聽聽你的想法。\n\n({character_name}等著你回應)回{character_name}，或者之後再聊也行。"
+            else:
+                interest_msg = f"{character_name}正在想著{interest}的事，手機突然響了。({character_name}看到是{user_profile.user_name}，嘴角上揚)來得正好。\n\n{character_name}記得你也喜歡{interest}，這讓{character_name}有點開心。({character_name}認真打字)或許我們會很合拍也說不定。\n\n({character_name}停頓了一下)對了，{user_profile.user_name}最近有在{interest}嗎？{character_name}想知道。\n\n({character_name}安靜等著)告訴{character_name}，或者我們聊點別的也可以。"
+
+            messages.append(interest_msg)
+
+        # Randomly select one message
+        selected_message = random.choice(messages)
 
         # Convert to Traditional Chinese to ensure consistency
-        return convert_to_traditional(greeting)
+        return convert_to_traditional(selected_message)
